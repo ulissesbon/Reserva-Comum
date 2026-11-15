@@ -49,7 +49,7 @@ def init():
             c.execute("INSERT INTO incidents(space_id,user,description,action,penalty_until,created) VALUES(1,'morador','Atraso na limpeza na utilização anterior.','Orientação registrada; sem penalidade.',NULL,?)", (now().isoformat(timespec='seconds'),))
             c.execute('INSERT INTO incidents(space_id,user,description,action,penalty_until,created) VALUES(2,?,?,?,?,?)',('restrito','Descumprimento das regras de uso.','Suspensão temporária.',(now()+timedelta(days=30)).isoformat(timespec='minutes'),now().isoformat(timespec='seconds')))
 
-def validate(c,d,user,exclude=None):
+def validate(c,d,user,exclude=None,for_approval=False):
     if type(d['space_id']) is not int: raise ValueError('Espaço deve ser um identificador inteiro.')
     s=c.execute('SELECT * FROM spaces WHERE id=?',(d['space_id'],)).fetchone()
     if not s: raise ValueError('Espaço inexistente.')
@@ -62,7 +62,10 @@ def validate(c,d,user,exclude=None):
     check('Finalidade',isinstance(d.get('purpose'),str) and 3<=len(d['purpose'].strip())<=200,'Descreva a finalidade em 3 a 200 caracteres.')
     check('Termos',d.get('terms') is True,'Aceite os termos antes de solicitar.')
     check('Capacidade',1<=d['guests']<=s['capacity'],f"Informe entre 1 e {s['capacity']} pessoas, incluindo você.")
-    check('Antecedência',start>=now()+timedelta(hours=s['notice']),f"Reserve com pelo menos {s['notice']} horas de antecedência.")
+    if for_approval:
+        check('Prazo de aprovação',start>now(),'A aprovação deve ocorrer antes do início da reserva.')
+    else:
+        check('Antecedência',start>=now()+timedelta(hours=s['notice']),f"Reserve com pelo menos {s['notice']} horas de antecedência.")
     check('Funcionamento',start.hour>=s['opens'] and end<=start.replace(hour=s['closes'],minute=0,second=0,microsecond=0),f"Escolha um intervalo entre {s['opens']}h e {s['closes']}h.")
     overlap=c.execute("SELECT 1 FROM bookings WHERE space_id=? AND status IN ('pendente','confirmada') AND start<? AND end>? AND id!=?",(s['id'],d['end'],d['start'],exclude or -1)).fetchone()
     check('Sobreposição',not overlap,'Escolha outro horário se houver pedido pendente ou reserva confirmada.')
@@ -310,11 +313,14 @@ class Handler(SimpleHTTPRequestHandler):
                     b=c.execute('SELECT * FROM bookings WHERE id=?',(d['id'],)).fetchone()
                     if not b: return self.send_json(404,{'error':'Pedido inexistente.'})
                     if b['status']!='pendente': return self.send_json(409,{'error':'Este pedido já foi decidido.'})
-                    if d.get('status') not in ('confirmada','rejeitada') or not isinstance(d.get('reason'),str) or not 5<=len(d['reason'].strip())<=500: raise ValueError('Informe decisão e justificativa de 5 a 500 caracteres.')
+                    if d.get('status') not in ('confirmada','rejeitada'): raise ValueError('Decisão inválida.')
+                    if not isinstance(d.get('reason'),str): raise ValueError('Informe a justificativa da decisão.')
+                    if len(d['reason'])>200: raise ValueError('A justificativa deve ter no máximo 200 caracteres.')
+                    if len(d['reason'].strip())<5: raise ValueError('A justificativa deve ter no mínimo 5 caracteres, sem contar espaços nas extremidades.')
                     if d['status']=='confirmada':
                         payload=dict(b); payload['terms']=True
-                        _,checks=validate(c,payload,b['user'],b['id'])
-                        if not all(x['ok'] for x in checks): return self.send_json(422,{'error':'As regras mudaram ou o prazo expirou. Rejeite o pedido com justificativa.','checks':checks})
+                        _,checks=validate(c,payload,b['user'],b['id'],for_approval=True)
+                        if not all(x['ok'] for x in checks): return self.send_json(422,{'error':'A aprovação foi recusada pelas regras atuais. Confira os impedimentos abaixo.','checks':checks})
                     c.execute('UPDATE bookings SET status=? WHERE id=?',(d['status'],b['id']))
                     event(c,b['id'],user,d['status'],d['reason'].strip()); c.commit()
                     return self.send_json(200,{'ok':True})

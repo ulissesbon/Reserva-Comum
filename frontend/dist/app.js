@@ -48,6 +48,10 @@ require("./style.css");
 const fmt = v => new Date(v).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 let csrfToken = '';
 const roleLabel = { usuario: 'Usuário', gestor: 'Gestor', admin: 'Administrador' };
+const DECISION_MIN = 5, DECISION_MAX = 200;
+function decisionReasonError(value) { if (Array.from(value).length > DECISION_MAX)
+    return `A justificativa deve ter no máximo ${DECISION_MAX} caracteres.`; if (Array.from(value.trim()).length < DECISION_MIN)
+    return `A justificativa deve ter no mínimo ${DECISION_MIN} caracteres, sem contar espaços nas extremidades.`; return ''; }
 async function api(path, data) {
     let r;
     try {
@@ -150,13 +154,16 @@ function App() {
     finally {
         setBusy(false);
     } }
-    async function decide(b, status) { setBusy(true); setMessage(''); try {
+    async function decide(b, status) { const issue = decisionReasonError(decision[b.id] || ''); if (issue)
+        throw new Error(issue); setBusy(true); setMessage(''); try {
         await api('decision', { id: b.id, status, reason: decision[b.id] || '' });
         await load();
         setMessage('Decisão registrada. O morador já pode consultar o resultado.');
     }
     catch (e) {
-        setMessage(e.message + (e.checks ? ' ' + e.checks.filter(x => !x.ok).map(x => x.name + ': ' + x.detail).join(' ') : ''));
+        const detail = e.message + (e.checks ? ' ' + e.checks.filter(x => !x.ok).map(x => x.name + ': ' + x.detail).join(' ') : '');
+        setMessage(detail);
+        throw new Error(detail);
     }
     finally {
         setBusy(false);
@@ -455,12 +462,7 @@ function App() {
                                 " ",
                                 react_1.default.createElement("strong", null, x.action))),
                             !data.incidents.some(x => x.space_id === b.space_id || x.user === b.user) && react_1.default.createElement("p", null, "Sem ocorr\u00EAncias relacionadas."),
-                            react_1.default.createElement("label", null,
-                                "Justificativa da decis\u00E3o",
-                                react_1.default.createElement("textarea", { minLength: "5", maxLength: "500", value: decision[b.id] || '', onChange: e => setDecision({ ...decision, [b.id]: e.target.value }) })),
-                            react_1.default.createElement("div", { className: "actions" },
-                                react_1.default.createElement("button", { disabled: busy, className: "primary", onClick: () => decide(b, 'confirmada') }, "Aprovar"),
-                                react_1.default.createElement("button", { disabled: busy, className: "secondary", onClick: () => decide(b, 'rejeitada') }, "Rejeitar"))))),
+                            react_1.default.createElement(DecisionJustification, { bookingId: b.id, value: decision[b.id] || '', onChange: value => setDecision(previous => ({ ...previous, [b.id]: value })), onDecision: status => decide(b, status), busy: busy })))),
                     react_1.default.createElement("section", { className: "panel" },
                         react_1.default.createElement("h2", null, "Hist\u00F3rico de auditoria"),
                         data.audit.length === 0 && react_1.default.createElement("p", null, "As novas solicita\u00E7\u00F5es e decis\u00F5es aparecer\u00E3o aqui."),
@@ -480,6 +482,38 @@ function App() {
                 "Reserva Comum \u00B7 Equipe 5 \u00B7 IFCE",
                 react_1.default.createElement("br", null),
                 "Consulta \u00B7 Reservas \u00B7 Gest\u00E3o \u00B7 Relat\u00F3rios")));
+}
+function DecisionJustification({ bookingId, value, onChange, onDecision, busy }) {
+    const [error, setError] = (0, react_1.useState)('');
+    const issue = decisionReasonError(value), count = Array.from(value).length, prefix = 'decision-' + bookingId;
+    async function decide(status) { if (busy)
+        return; if (issue) {
+        setError(issue);
+        return;
+    } setError(''); try {
+        await onDecision(status);
+    }
+    catch (e) {
+        setError(e.message || 'Não foi possível registrar a decisão. Tente novamente.');
+    } }
+    return react_1.default.createElement("div", { className: "decision-justification" },
+        react_1.default.createElement("label", { htmlFor: prefix }, "Justificativa da decis\u00E3o"),
+        react_1.default.createElement("textarea", { id: prefix, disabled: busy, value: value, "aria-invalid": Boolean(issue), "aria-describedby": prefix + '-hint ' + prefix + '-count' + (error ? ' ' + prefix + '-error' : ''), onChange: e => { onChange(e.target.value); setError(''); } }),
+        react_1.default.createElement("div", { className: "decision-meta" },
+            react_1.default.createElement("p", { id: prefix + '-hint' },
+                "Use de ",
+                DECISION_MIN,
+                " a ",
+                DECISION_MAX,
+                " caracteres. Espa\u00E7os nas extremidades n\u00E3o contam para o m\u00EDnimo."),
+            react_1.default.createElement("span", { id: prefix + '-count', className: 'decision-counter' + (issue ? ' invalid' : ''), "aria-live": "polite" },
+                count,
+                "/",
+                DECISION_MAX)),
+        error && react_1.default.createElement("p", { id: prefix + '-error', role: "alert", className: "error-message" }, error),
+        react_1.default.createElement("div", { className: "actions" },
+            react_1.default.createElement("button", { type: "button", disabled: busy, "aria-disabled": busy || Boolean(issue), className: 'primary' + (issue ? ' decision-unavailable' : ''), title: issue || undefined, onClick: () => decide('confirmada') }, "Aprovar"),
+            react_1.default.createElement("button", { type: "button", disabled: busy, "aria-disabled": busy || Boolean(issue), className: 'secondary' + (issue ? ' decision-unavailable' : ''), title: issue || undefined, onClick: () => decide('rejeitada') }, "Rejeitar")));
 }
 function AgendaHistory({ space, date, bookings, blocks, ownedIds }) {
     const start = date + 'T00:00', end = shiftDay(date, 1) + 'T00:00';

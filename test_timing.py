@@ -57,3 +57,24 @@ class TimingTests(AppTestCase):
             payload={'space_id':1,'start':'2026-11-15T17:05','end':'2026-11-15T18:00','reason':'Manutenção programada.'}
             self.assertEqual(self.call(manager,'blocks',payload)[0],400)
             self.assertEqual(self.call(manager,'blocks',{**payload,'start':'2026-11-15T17:06'})[0],200)
+
+    def test_approval_does_not_restart_the_original_advance_notice_window(self):
+        user=self.client('morador');manager=self.client('gestor')
+        payload=self.request_data(1,'2026-11-16T18:00','2026-11-16T19:00')
+        with patch.object(server,'now',return_value=datetime(2026,11,15,17,49)):
+            status,result=self.call(user,'bookings',payload)
+            self.assertEqual(status,200);bid=result['id']
+        with patch.object(server,'now',return_value=datetime(2026,11,15,18,8)):
+            self.assertEqual(self.call(manager,'decision',{'id':bid,'status':'confirmada','reason':'Regras verificadas.'})[0],200)
+
+    def test_approval_is_refused_at_start_with_an_explicit_failed_rule(self):
+        user=self.client('morador');manager=self.client('gestor')
+        payload=self.request_data(1,'2026-11-16T18:00','2026-11-16T19:00')
+        with patch.object(server,'now',return_value=datetime(2026,11,15,17,49)):
+            bid=self.call(user,'bookings',payload)[1]['id']
+        with patch.object(server,'now',return_value=datetime(2026,11,16,18)):
+            status,result=self.call(manager,'decision',{'id':bid,'status':'confirmada','reason':'Tentativa após o início.'})
+        self.assertEqual(status,422)
+        self.assertEqual([c['name'] for c in result['checks'] if not c['ok']],['Prazo de aprovação'])
+        with server.connect() as c:
+            self.assertEqual(c.execute('SELECT status FROM bookings WHERE id=?',(bid,)).fetchone()[0],'pendente')

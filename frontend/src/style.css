@@ -39,3 +39,11 @@
 .action-fields:disabled{opacity:.45}
 .action-fields>button{width:100%;margin-top:10px}
 .readonly-message{font-size:13px;color:#53665d;line-height:1.6}
+
+
+.decision-meta{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin:0 0 14px;font-size:12px}
+.decision-meta p{margin:0;flex:1;min-width:180px;color:#53665d;line-height:1.5}
+.decision-counter{white-space:nowrap;color:#53665d;font-weight:700}
+.decision-counter.invalid{color:#a52622}
+.decision-unavailable{opacity:.45;cursor:not-allowed}
+.decision-justification textarea[aria-invalid="true"]{border-color:#a52622}

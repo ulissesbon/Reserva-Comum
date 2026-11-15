@@ -99,11 +99,21 @@ These are fictional project parameters. Business timestamps use Fortaleza time
 barbecue requests remain pending until a manager or admin makes a decision.
 
 Pending and confirmed reservations both occupy their intervals. Creation and
-approval revalidate the rules inside a SQLite write transaction. Approval also
-rechecks advance notice, so a late decision can be refused. Requesters may cancel
+approval revalidate conflicts and current impediments inside a SQLite write
+transaction. Advance notice is checked when submitting the request; manager
+approval is allowed until the reservation starts without requiring the original
+advance-notice window a second time. Requesters may cancel
 before the reservation starts. Cancellation and slot release are atomic; repeated
 cancellation does not duplicate its audit event. Reservation audit records cannot
 be updated or deleted through SQL while the protection triggers are installed.
+
+Manager decisions require a justification of 5–200 characters. Leading/trailing
+spaces do not count toward the minimum. The live counter turns red below the
+minimum or above the maximum, and decision buttons appear unavailable while the
+text is invalid. Clicking an unavailable decision explains the applicable limit
+without submitting it. Both approval and rejection are validated again by the API.
+Server refusals and their failed rules appear beside the decision buttons as well
+as in the page notice, so a blocked approval does not appear to do nothing.
 
 On the user agenda, click the first and last hourly cells to select an interval.
 Selected cells are blue, separate from confirmed and pending states. Start/end
@@ -307,6 +317,7 @@ small commits. Repository instructions are maintained in `AGENTS.md`.
 - `test_features.py`: authentication, permissions, and reports.
 - `test_blocks.py`: schedule blocks, conflicts, concurrency, and audit history.
 - `test_timing.py`: server clock, advance-notice boundaries, and past-time rejection.
+- `test_decision_reason.py`: decision-reason boundaries and character counts.
 - `test_history.py`: private historical agenda reads.
 - `test_spaces.py`: configurable-space creation and rule validation.
 - `frontend/src/`: React interface and CSS.

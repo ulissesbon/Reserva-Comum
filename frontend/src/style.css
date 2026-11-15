@@ -6,14 +6,11 @@
 .login-panel{max-width:520px;margin:30px auto}.report-filters{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:16px;align-items:end}.report-filters>button{width:auto;margin:0 0 16px}.table-scroll{max-width:100%;overflow-x:auto;margin:24px 0}table{width:100%;border-collapse:collapse;font-size:13px}caption{text-align:left;font-weight:700;padding:10px 0}th,td{padding:13px 12px;border-bottom:1px solid #dce4dc;text-align:left;white-space:nowrap}thead{background:#edf4e9}.cell-note{display:block;color:#53665d;margin-top:6px}.download-link{color:#205640;font-weight:700}.error-message{background:#fcebea;color:#8e2c25;padding:14px;border-radius:8px}.account-create{max-width:600px;padding-bottom:24px}.account-row h4{margin-top:0}.account-row>button{width:auto}nav{flex-wrap:wrap}.profile span{font-size:13px}@media(max-width:760px){.report-filters{grid-template-columns:1fr 1fr}.report-filters>button{width:100%}.two{grid-template-columns:1fr}.login-panel{margin:20px auto}.profile{align-items:center}}
 
 
-/* Agenda ampliada para os perfis de gestão. */
-.columns.agenda-wide{grid-template-columns:minmax(0,1fr)}
-.agenda-wide .slots{grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
-.agenda-wide .slot{min-height:96px;padding:18px}
-.agenda-wide .slot b{font-size:20px}
-.agenda-wide .slot span{font-size:12px}
-@media(max-width:760px){.agenda-wide .slots{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.agenda-wide .slot{min-height:84px;padding:14px}}
-
+/* The management agenda shares the responsive reservation layout. */
+.columns-manager{grid-template-columns:minmax(0,1.5fr) minmax(0,1fr)}
+.columns-manager .sectionhead{flex-wrap:wrap}
+.columns-manager .slot{min-height:84px}
+@media(max-width:760px){.columns-manager{grid-template-columns:minmax(0,1fr)}}
 
 /* Seleção temporária: azul, distinta dos estados de reserva. */
 .slot.selected-slot,.slot.selected-slot:hover{background:#e5edff;border-color:#4068b0;color:#153a80;box-shadow:inset 0 0 0 1px #4068b0}
@@ -24,4 +21,4 @@
 .date-arrow{display:flex;align-items:center;justify-content:center;flex:0 0 44px;width:44px;height:44px;padding:0}
 @media(max-width:760px){.date-navigation{width:100%}.date-controls input{width:100%}}
 
-.block-manager{scroll-margin-top:24px}.block-create{max-width:680px}.block-manager a,.agenda-wide .muted a{color:#205640;font-weight:700}.block-manager h4{margin:0 0 10px}.block-manager .actions>button{width:auto;margin:0}
+.block-manager{scroll-margin-top:24px}.block-create{width:100%}.block-manager a,.columns-manager .muted a{color:#205640;font-weight:700}.block-manager h4{margin:0 0 10px}.block-manager .actions>button{width:auto;margin:0}

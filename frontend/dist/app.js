@@ -70,12 +70,21 @@ async function api(path, data) {
     return j;
 }
 function shiftDay(value, amount) { const day = new Date(value + 'T12:00:00Z'); day.setUTCDate(day.getUTCDate() + amount); return day.toISOString().slice(0, 10); }
+function formatTime(minutes) { return String(Math.floor(minutes / 60)).padStart(2, '0') + ':' + String(minutes % 60).padStart(2, '0'); }
+function suggestBlockEnd(start, closes) {
+    if (!/^\d{2}:\d{2}$/.test(start))
+        return '';
+    const [hour, minute] = start.split(':').map(Number);
+    if (hour > 23 || minute > 59)
+        return '';
+    return formatTime(Math.min(hour * 60 + minute + 60, closes * 60));
+}
 function App() {
-    const [selectionAnchor, setSelectionAnchor] = (0, react_1.useState)(null), [hasSelection, setHasSelection] = (0, react_1.useState)(false);
+    const [selectionAnchor, setSelectionAnchor] = (0, react_1.useState)(null), [hasSelection, setHasSelection] = (0, react_1.useState)(false), [blockRange, setBlockRange] = (0, react_1.useState)(null);
     const [filter, setFilter] = (0, react_1.useState)('todas'), [data, setData] = (0, react_1.useState)(null), [credentials, setCredentials] = (0, react_1.useState)({ username: '', password: '' }), [tab, setTab] = (0, react_1.useState)('agenda'), [space, setSpace] = (0, react_1.useState)(1), [date, setDate] = (0, react_1.useState)(''), [result, setResult] = (0, react_1.useState)(null), [message, setMessage] = (0, react_1.useState)(''), [busy, setBusy] = (0, react_1.useState)(false), [decision, setDecision] = (0, react_1.useState)({}), [form, setForm] = (0, react_1.useState)({ start: '10:00', end: '12:00', purpose: '', guests: 2, terms: false });
     async function load() { const d = await api('state'); setData(d); setDate(v => v || new Date(new Date(d.today + 'T12:00').getTime() + 3 * 86400000).toISOString().slice(0, 10)); }
     (0, react_1.useEffect)(() => { const expired = () => { setData(null); setResult(null); csrfToken = ''; setMessage('Sua sessão expirou. Entre novamente.'); }; window.addEventListener('session-expired', expired); load().catch(e => { setMessage(e.status === 401 ? '' : e.message); }); return () => window.removeEventListener('session-expired', expired); }, []);
-    function endSession(text = 'Você saiu da sua conta.') { setSelectionAnchor(null); setHasSelection(false); csrfToken = ''; setData(null); setResult(null); setDecision({}); setFilter('todas'); setDate(''); setForm({ start: '10:00', end: '12:00', purpose: '', guests: 2, terms: false }); setTab('agenda'); setMessage(text); }
+    function endSession(text = 'Você saiu da sua conta.') { setSelectionAnchor(null); setHasSelection(false); setBlockRange(null); csrfToken = ''; setData(null); setResult(null); setDecision({}); setFilter('todas'); setDate(''); setForm({ start: '10:00', end: '12:00', purpose: '', guests: 2, terms: false }); setTab('agenda'); setMessage(text); }
     async function logout() { setBusy(true); try {
         await api('logout', {});
         endSession();
@@ -141,12 +150,21 @@ function App() {
     const reservations = data ? (data.role !== 'usuario' ? data.bookings : data.mine) : [];
     const visible = reservations.filter(b => filter === 'todas' || b.status === filter);
     const s = data === null || data === void 0 ? void 0 : data.spaces.find(x => x.id === space);
+    const activeBlockRange = (blockRange === null || blockRange === void 0 ? void 0 : blockRange.space_id) === space && blockRange.date === date ? blockRange : { start: formatTime(((s === null || s === void 0 ? void 0 : s.opens) || 8) * 60), end: formatTime(Math.min(((s === null || s === void 0 ? void 0 : s.opens) || 8) + 1, (s === null || s === void 0 ? void 0 : s.closes) || 22) * 60) };
+    const selectedRange = (data === null || data === void 0 ? void 0 : data.role) === 'usuario' ? form : activeBlockRange;
+    function clearSelection() { setSelectionAnchor(null); setHasSelection(false); }
+    function changeBlockTime(key, value) {
+        setBlockRange({ ...activeBlockRange, space_id: space, date, [key]: value, ...(key === 'start' ? { end: suggestBlockEnd(value, s.closes) } : {}) });
+        clearSelection();
+        setHasSelection(true);
+        setMessage('');
+    }
     const field = (key, value) => { setForm(previous => ({ ...previous, [key]: value })); setResult(null); if (key === 'start' || key === 'end') {
         setSelectionAnchor(null);
         setHasSelection(true);
     } };
     function changeDate(value) { if (!value || value < data.today)
-        return; setDate(value); setSelectionAnchor(null); setHasSelection(false); setResult(null); setMessage(''); }
+        return; setDate(value); clearSelection(); setBlockRange(null); setResult(null); setMessage(''); }
     function selectHour(hour) {
         const first = selectionAnchor === null ? hour : Math.min(selectionAnchor, hour), last = selectionAnchor === null ? hour + 1 : Math.max(selectionAnchor, hour) + 1;
         const start = String(first).padStart(2, '0') + ':00', end = String(last).padStart(2, '0') + ':00';
@@ -156,7 +174,10 @@ function App() {
             setSelectionAnchor(null);
             return;
         }
-        setForm(previous => ({ ...previous, start, end }));
+        if (data.role === 'usuario')
+            setForm(previous => ({ ...previous, start, end }));
+        else
+            setBlockRange({ space_id: space, date, start, end });
         setHasSelection(true);
         setSelectionAnchor(selectionAnchor === null ? hour : null);
         setResult(null);
@@ -226,7 +247,7 @@ function App() {
                 tab === 'users' && data.role === 'admin' && react_1.default.createElement(Accounts, { currentUser: data.user }),
                 tab === 'account' && react_1.default.createElement(PasswordForm, { onChanged: () => endSession('Senha alterada. Entre novamente com sua nova senha.') }),
                 tab === 'agenda' && react_1.default.createElement(react_1.default.Fragment, null,
-                    react_1.default.createElement("div", { className: "cards" }, data.spaces.map(x => react_1.default.createElement("button", { key: x.id, className: 'space ' + (space === x.id ? 'selected' : ''), onClick: () => { setSpace(x.id); setSelectionAnchor(null); setHasSelection(false); setResult(null); } },
+                    react_1.default.createElement("div", { className: "cards" }, data.spaces.map(x => react_1.default.createElement("button", { key: x.id, className: 'space ' + (space === x.id ? 'selected' : ''), onClick: () => { setSpace(x.id); clearSelection(); setBlockRange(null); setResult(null); } },
                         react_1.default.createElement("div", { className: 'illustration i' + x.id },
                             react_1.default.createElement("span", null, x.id === 1 ? '♨' : '≈')),
                         react_1.default.createElement("div", { className: "cardbody" },
@@ -241,7 +262,7 @@ function App() {
                                     x.capacity,
                                     " pessoas"),
                                 react_1.default.createElement("span", null, x.fee ? `R$ ${x.fee.toFixed(2)}` : 'Gratuito')))))),
-                    react_1.default.createElement("div", { className: data.role === 'usuario' ? 'columns' : 'columns agenda-wide' },
+                    react_1.default.createElement("div", { className: data.role === 'usuario' ? 'columns' : 'columns columns-manager' },
                         react_1.default.createElement("section", { className: "panel" },
                             react_1.default.createElement("div", { className: "sectionhead" },
                                 react_1.default.createElement("h2", null,
@@ -262,17 +283,17 @@ function App() {
                                 react_1.default.createElement("span", null, "\u25CF Confirmada"),
                                 react_1.default.createElement("span", null, "\u25D0 Pendente"),
                                 react_1.default.createElement("span", null, "\u25A7 Bloqueado"),
-                                data.role === 'usuario' && react_1.default.createElement("span", { className: "selected-legend" }, "\u25C6 Selecionado")),
-                            react_1.default.createElement("div", { className: "slots" }, Array.from({ length: s.closes - s.opens }, (_, i) => { let h = s.opens + i; let start = date + 'T' + String(h).padStart(2, '0') + ':00'; let end = date + 'T' + String(h + 1).padStart(2, '0') + ':00'; const b = data.blocks.find(x => x.space_id === space && x.start < end && x.end > start); const a = data.agenda.find(x => x.space_id === space && x.start < end && x.end > start); let status = b ? 'bloqueado' : (a === null || a === void 0 ? void 0 : a.status) || 'disponível'; const selected = data.role === 'usuario' && hasSelection && status === 'disponível' && form.end > form.start && date + 'T' + form.start < end && date + 'T' + form.end > start; return react_1.default.createElement("button", { key: h, className: 'slot ' + status + (selected ? ' selected-slot' : ''), "aria-pressed": data.role === 'usuario' ? selected : undefined, disabled: busy || status !== 'disponível' || data.role !== 'usuario', onClick: () => selectHour(h) },
+                                react_1.default.createElement("span", { className: "selected-legend" }, "\u25C6 Selecionado")),
+                            react_1.default.createElement("div", { className: "slots" }, Array.from({ length: s.closes - s.opens }, (_, i) => { let h = s.opens + i; let start = date + 'T' + String(h).padStart(2, '0') + ':00'; let end = date + 'T' + String(h + 1).padStart(2, '0') + ':00'; const b = data.blocks.find(x => x.space_id === space && x.start < end && x.end > start); const a = data.agenda.find(x => x.space_id === space && x.start < end && x.end > start); let status = b ? 'bloqueado' : (a === null || a === void 0 ? void 0 : a.status) || 'disponível'; const selected = hasSelection && status === 'disponível' && selectedRange.end > selectedRange.start && date + 'T' + selectedRange.start < end && date + 'T' + selectedRange.end > start; return react_1.default.createElement("button", { key: h, className: 'slot ' + status + (selected ? ' selected-slot' : ''), "aria-pressed": selected, disabled: busy || status !== 'disponível', onClick: () => selectHour(h) },
                                 react_1.default.createElement("b", null,
                                     String(h).padStart(2, '0'),
                                     ":00"),
                                 react_1.default.createElement("span", null, selected ? 'Selecionado' : status),
                                 b && react_1.default.createElement("small", null, b.reason)); })),
                             react_1.default.createElement("p", { className: "muted" }, data.role === 'usuario' ? 'Clique no horário inicial e depois no último horário desejado para selecionar um intervalo. Você também pode ajustar início e fim no formulário.' : react_1.default.createElement(react_1.default.Fragment, null,
-                                "Consulte a disponibilidade do espa\u00E7o nesta data. Use ",
+                                "Consulte a disponibilidade do espa\u00E7o nesta data. Clique no hor\u00E1rio inicial e no \u00FAltimo hor\u00E1rio desejado para preencher ",
                                 react_1.default.createElement("a", { href: "#agenda-blocks" }, "Bloquear hor\u00E1rios"),
-                                " abaixo para manuten\u00E7\u00E3o ou indisponibilidade. Pedidos s\u00E3o analisados em Gest\u00E3o e auditoria.")),
+                                ". Pedidos s\u00E3o analisados em Gest\u00E3o e auditoria.")),
                             react_1.default.createElement("h3", null,
                                 "Regras vigentes \u00B7 vers\u00E3o ",
                                 s.rules_version),
@@ -299,7 +320,7 @@ function App() {
                                 react_1.default.createElement("li", null, "Pedidos pendentes tamb\u00E9m reservam o intervalo."),
                                 react_1.default.createElement("li", null, "N\u00E3o \u00E9 permitido reservar durante suspens\u00E3o ativa."),
                                 react_1.default.createElement("li", null, "Cancelamento at\u00E9 o in\u00EDcio da reserva, sem multa nesta demonstra\u00E7\u00E3o."))),
-                        data.role === 'usuario' && react_1.default.createElement("section", { className: "panel" },
+                        data.role === 'usuario' ? react_1.default.createElement("section", { className: "panel" },
                             react_1.default.createElement("p", { className: "eyebrow" }, "SEU PR\u00D3XIMO ENCONTRO"),
                             react_1.default.createElement("h2", null, "Solicitar reserva"),
                             react_1.default.createElement("p", { className: "muted" },
@@ -327,8 +348,7 @@ function App() {
                                 react_1.default.createElement("button", { className: "primary", disabled: busy || data.role !== 'usuario' }, busy ? 'Processando…' : 'Enviar solicitação')),
                             result && react_1.default.createElement("div", { role: "status" },
                                 react_1.default.createElement("h3", null, result.id ? 'Solicitação registrada' : result.ok ? 'Regras atendidas' : 'Revise os impedimentos'),
-                                checks(result.checks)))),
-                    data.role !== 'usuario' && react_1.default.createElement(BlockManager, { key: space + ':' + date, space: s, date: date, blocks: data.blocks, history: data.block_audit || [], onSaved: load })),
+                                checks(result.checks))) : react_1.default.createElement(BlockManager, { key: space + ':' + date, space: s, date: date, range: activeBlockRange, onRangeChange: changeBlockTime, onBlocked: clearSelection, busy: busy, setBusy: setBusy, blocks: data.blocks, history: data.block_audit || [], onSaved: load }))),
                 tab === 'mine' && react_1.default.createElement("section", { className: "panel" },
                     react_1.default.createElement("h2", null, data.role !== 'usuario' ? 'Todas as solicitações' : 'Minhas reservas'),
                     react_1.default.createElement("label", { className: "filter" },
@@ -428,22 +448,33 @@ function DecisionNotes({ data }) { return react_1.default.createElement("div", n
             x.actor,
             " \u00B7 ",
             fmt(x.created))))); }
-function BlockManager({ space, date, blocks, history, onSaved }) {
-    const [form, setForm] = (0, react_1.useState)({ start: String(space.opens).padStart(2, '0') + ':00', end: String(space.opens + 1).padStart(2, '0') + ':00', reason: '' }), [removal, setRemoval] = (0, react_1.useState)(null), [message, setMessage] = (0, react_1.useState)(''), [error, setError] = (0, react_1.useState)(''), [busy, setBusy] = (0, react_1.useState)(false);
+function BlockManager({ space, date, range, onRangeChange, onBlocked, busy, setBusy, blocks, history, onSaved }) {
+    const [reason, setReason] = (0, react_1.useState)(''), [removal, setRemoval] = (0, react_1.useState)(null), [message, setMessage] = (0, react_1.useState)(''), [error, setError] = (0, react_1.useState)('');
     const visible = blocks.filter(b => b.space_id === space.id && b.start < date + 'T23:59:59' && b.end > date + 'T00:00').sort((a, b) => a.start.localeCompare(b.start));
     const events = history.filter(b => b.space_id === space.id && b.start < date + 'T23:59:59' && b.end > date + 'T00:00');
-    async function save(e) { e.preventDefault(); setBusy(true); setMessage(''); setError(''); try {
-        await api('blocks', { space_id: space.id, start: date + 'T' + form.start, end: date + 'T' + form.end, reason: form.reason });
-        setForm(v => ({ ...v, reason: '' }));
-        await onSaved();
-        setMessage('Horário bloqueado. A agenda já foi atualizada.');
+    async function save(e) {
+        e.preventDefault();
+        setMessage('');
+        setError('');
+        if (!range.start || !range.end || range.end <= range.start) {
+            setError('Escolha um horário de fim após o início.');
+            return;
+        }
+        setBusy(true);
+        try {
+            await api('blocks', { space_id: space.id, start: date + 'T' + range.start, end: date + 'T' + range.end, reason });
+            await onSaved();
+            setReason('');
+            onBlocked();
+            setMessage('Horário bloqueado. A agenda já foi atualizada.');
+        }
+        catch (e) {
+            setError(e.message);
+        }
+        finally {
+            setBusy(false);
+        }
     }
-    catch (e) {
-        setError(e.message);
-    }
-    finally {
-        setBusy(false);
-    } }
     async function remove(e) { e.preventDefault(); setBusy(true); setMessage(''); setError(''); try {
         await api('blocks/remove', removal);
         setRemoval(null);
@@ -459,24 +490,25 @@ function BlockManager({ space, date, blocks, history, onSaved }) {
     return react_1.default.createElement("section", { id: "agenda-blocks", className: "panel block-manager" },
         react_1.default.createElement("p", { className: "eyebrow" }, "DISPONIBILIDADE DO ESPA\u00C7O"),
         react_1.default.createElement("h2", null, "Bloquear hor\u00E1rios"),
-        react_1.default.createElement("p", null,
-            react_1.default.createElement("strong", null, space.name),
+        react_1.default.createElement("p", { className: "muted" },
+            space.name,
             " \u00B7 ",
             date && date.split('-').reverse().join('/')),
-        react_1.default.createElement("p", { className: "muted" }, "Escolha o espa\u00E7o e a data na agenda acima. Bloqueios impedem novas reservas, exigem um motivo e n\u00E3o podem se sobrepor a reservas pendentes, confirmadas ou a outro bloqueio. O motivo do bloqueio ficar\u00E1 vis\u00EDvel na agenda."),
+        react_1.default.createElement("p", { className: "muted" }, "Selecione o intervalo na agenda ou ajuste os hor\u00E1rios abaixo. O motivo ficar\u00E1 vis\u00EDvel na agenda."),
         message && react_1.default.createElement("p", { role: "status", className: "notice" }, message),
         error && react_1.default.createElement("p", { role: "alert", className: "error-message" }, error),
         react_1.default.createElement("form", { className: "block-create", onSubmit: save },
             react_1.default.createElement("div", { className: "two" },
                 react_1.default.createElement("label", null,
                     "In\u00EDcio do bloqueio",
-                    react_1.default.createElement("input", { type: "time", required: true, min: String(space.opens).padStart(2, '0') + ':00', max: String(space.closes).padStart(2, '0') + ':00', value: form.start, onChange: e => setForm({ ...form, start: e.target.value }) })),
+                    react_1.default.createElement("input", { type: "time", required: true, disabled: busy, min: formatTime(space.opens * 60), max: formatTime(space.closes * 60 - 1), value: range.start, onChange: e => onRangeChange('start', e.target.value) })),
                 react_1.default.createElement("label", null,
                     "Fim do bloqueio",
-                    react_1.default.createElement("input", { type: "time", required: true, min: String(space.opens).padStart(2, '0') + ':00', max: String(space.closes).padStart(2, '0') + ':00', value: form.end, onChange: e => setForm({ ...form, end: e.target.value }) }))),
+                    react_1.default.createElement("input", { type: "time", required: true, disabled: busy, min: range.start || formatTime(space.opens * 60), max: formatTime(space.closes * 60), value: range.end, onChange: e => onRangeChange('end', e.target.value) }))),
+            react_1.default.createElement("p", { className: "muted" }, "Ao mudar o in\u00EDcio, o fim ser\u00E1 sugerido para uma hora depois, limitado ao fechamento do espa\u00E7o. Voc\u00EA pode ajustar o fim para um intervalo maior."),
             react_1.default.createElement("label", null,
                 "Motivo do bloqueio",
-                react_1.default.createElement("textarea", { required: true, minLength: "5", maxLength: "500", placeholder: "Ex.: manuten\u00E7\u00E3o ou limpeza programada", value: form.reason, onChange: e => setForm({ ...form, reason: e.target.value }) })),
+                react_1.default.createElement("textarea", { required: true, disabled: busy, minLength: "5", maxLength: "500", placeholder: "Ex.: manuten\u00E7\u00E3o ou limpeza programada", value: reason, onChange: e => setReason(e.target.value) })),
             react_1.default.createElement("button", { className: "primary", disabled: busy || !date }, busy ? 'Processando…' : 'Bloquear horário')),
         react_1.default.createElement("h3", null, "Bloqueios deste dia"),
         visible.length === 0 && react_1.default.createElement("p", { className: "empty" }, "N\u00E3o h\u00E1 bloqueios neste espa\u00E7o e data."),

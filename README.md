@@ -113,8 +113,15 @@ navigation before today. The backend remains the authority for availability.
 ## Schedule blocks
 
 Under **Espaços e agenda**, managers and admins select a space and date, then use
-**Bloquear horários** below the agenda. Enter a start, end, and a 5–500-character
-reason. The reason is visible in the public agenda.
+**Bloquear horários** beside the agenda on desktop or below it on narrow screens.
+Click the first and last available cells to fill the blocking interval, or enter
+start/end times directly. The blue selection stays synchronized with the form;
+confirmed, pending, and blocked cells retain their own colors and are unavailable
+for selection. Saving a block refreshes the agenda and clears the temporary selection.
+
+Changing the start suggests an end one hour later, capped at the space's closing
+time. The end remains editable for longer intervals. Enter a 5–500-character
+reason; the reason is visible in the public agenda.
 
 New blocks must start in the future, stay within one day and the space's opening
 hours, and avoid pending/confirmed reservations and other active blocks. Adjacent

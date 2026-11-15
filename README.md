@@ -128,6 +128,22 @@ require two hours' notice, barbecue reservations still require 24 hours, and no
 late-booking grace period or new approval-expiration rule is applied. The backend
 remains the authority for availability and validates every write again.
 
+## Creating spaces
+
+Managers and admins can use **Cadastrar espaço** to register a name, description,
+capacity, opening/closing hours, informational fee, minimum advance notice,
+monthly reservation limit, and whether manager approval is required. The new
+space becomes available in the existing agenda, booking, blocking, and reporting
+flows. Regular users cannot create spaces.
+
+These parameters are already persisted in `spaces` and read by the generic
+reservation validator. The pool/barbecue values in `init()` are initial examples,
+not conditions that limit the application to two spaces. Core algorithms such as
+conflict checks, ownership, suspension, and same-day intervals remain implemented
+in code. New spaces use whole-hour opening/closing times between 00:00 and 23:00,
+without crossing midnight; names must be unique ignoring case. This screen creates
+spaces; editing existing rules and spaces remains outside this update.
+
 ## Schedule blocks
 
 Under **Espaços e agenda**, managers and admins select a space and date, then use
@@ -292,6 +308,7 @@ small commits. Repository instructions are maintained in `AGENTS.md`.
 - `test_blocks.py`: schedule blocks, conflicts, concurrency, and audit history.
 - `test_timing.py`: server clock, advance-notice boundaries, and past-time rejection.
 - `test_history.py`: private historical agenda reads.
+- `test_spaces.py`: configurable-space creation and rule validation.
 - `frontend/src/`: React interface and CSS.
 - `frontend/dist/`: compiled application ready for local execution.
 - `.github/workflows/ci.yml`: continuous integration.
@@ -299,7 +316,7 @@ small commits. Repository instructions are maintained in `AGENTS.md`.
 
 ## Remaining scope
 
-Waitlists, external notifications, full space/rule configuration through the UI,
+Waitlists, external notifications, editing existing spaces/rules through the UI,
 payments, and financial reports are not implemented. Incident records link a user
 and a space but do not include attachments or classification.
 

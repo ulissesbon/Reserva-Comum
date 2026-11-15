@@ -207,6 +207,26 @@ class Handler(SimpleHTTPRequestHandler):
                         c.execute('DELETE FROM sessions WHERE username=?',(username,))
                         auth.security_event(c,user,'conta_atualizada',username)
                     c.commit();return self.send_json(200,{'ok':True})
+                if self.path=='/api/spaces':
+                    if role not in ('gestor','admin'):
+                        return self.send_json(403,{'error':'Apenas gestores e administradores podem cadastrar espaços.'})
+                    for key,minimum,maximum in (('name',3,80),('description',5,500)):
+                        if not isinstance(d.get(key),str) or not minimum<=len(d[key].strip())<=maximum:
+                            raise ValueError(f'{"Nome" if key=="name" else "Descrição"}: informe de {minimum} a {maximum} caracteres.')
+                    for key,minimum,maximum in (('capacity',1,10000),('opens',0,22),('closes',1,23),('notice',0,8760),('monthly_limit',1,1000)):
+                        if type(d.get(key)) is not int or not minimum<=d[key]<=maximum:
+                            raise ValueError(f'Campo {key}: informe um número inteiro entre {minimum} e {maximum}.')
+                    if d['closes']<=d['opens']: raise ValueError('O fechamento deve ser após a abertura, no mesmo dia.')
+                    if type(d.get('fee')) not in (int,float) or not 0<=d['fee']<=1000000:
+                        raise ValueError('A taxa deve ser um valor entre 0 e 1.000.000.')
+                    if type(d.get('approval')) is not bool: raise ValueError('Informe se o espaço exige aprovação.')
+                    name=d['name'].strip()
+                    if any(row['name'].casefold()==name.casefold() for row in c.execute('SELECT name FROM spaces')):
+                        return self.send_json(409,{'error':'Já existe um espaço com esse nome.'})
+                    cur=c.execute('''INSERT INTO spaces(name,description,capacity,opens,closes,fee,notice,monthly_limit,approval,rules_version)
+                        VALUES(?,?,?,?,?,?,?,?,?,?)''',(name,d['description'].strip(),d['capacity'],d['opens'],d['closes'],d['fee'],d['notice'],d['monthly_limit'],int(d['approval']),'1.0'))
+                    auth.security_event(c,user,'espaco_criado',str(cur.lastrowid));c.commit()
+                    return self.send_json(200,{'ok':True,'id':cur.lastrowid})
                 if self.path in ('/api/blocks','/api/blocks/remove'):
                     if role not in ('gestor','admin'):
                         return self.send_json(403,{'error':'Apenas gestores e administradores podem gerenciar bloqueios.'})

@@ -100,7 +100,7 @@ function minimumStart(date, timestamp, opens, closes, notice = 0) {
 }
 function agendaStatusLabel(status, owned) { return status === 'confirmada' ? (owned ? 'Confirmada' : 'Reservada') : status === 'sem-registro' ? 'Sem registro' : status; }
 function App() {
-    var _a, _b;
+    var _a, _b, _c, _d, _e;
     const [selectionAnchor, setSelectionAnchor] = (0, react_1.useState)(null), [hasSelection, setHasSelection] = (0, react_1.useState)(false), [blockRange, setBlockRange] = (0, react_1.useState)(null);
     const [filter, setFilter] = (0, react_1.useState)('todas'), [data, setData] = (0, react_1.useState)(null), [credentials, setCredentials] = (0, react_1.useState)({ username: '', password: '' }), [tab, setTab] = (0, react_1.useState)('agenda'), [space, setSpace] = (0, react_1.useState)(1), [date, setDate] = (0, react_1.useState)(''), [result, setResult] = (0, react_1.useState)(null), [message, setMessage] = (0, react_1.useState)(''), [busy, setBusy] = (0, react_1.useState)(false), [decision, setDecision] = (0, react_1.useState)({}), [form, setForm] = (0, react_1.useState)({ start: '10:00', end: '12:00', purpose: '', guests: 2, terms: false });
     const [clockOffset, setClockOffset] = (0, react_1.useState)(null), [clock, setClock] = (0, react_1.useState)(null);
@@ -176,12 +176,12 @@ function App() {
     const reservations = data ? (data.role !== 'usuario' ? data.bookings : data.mine) : [];
     const visible = reservations.filter(b => filter === 'todas' || b.status === filter);
     const s = data === null || data === void 0 ? void 0 : data.spaces.find(x => x.id === space);
-    const activeBlockRange = (blockRange === null || blockRange === void 0 ? void 0 : blockRange.space_id) === space && blockRange.date === date ? blockRange : { start: formatTime(((s === null || s === void 0 ? void 0 : s.opens) || 8) * 60), end: formatTime(Math.min(((s === null || s === void 0 ? void 0 : s.opens) || 8) + 1, (s === null || s === void 0 ? void 0 : s.closes) || 22) * 60) };
+    const activeBlockRange = (blockRange === null || blockRange === void 0 ? void 0 : blockRange.space_id) === space && blockRange.date === date ? blockRange : { start: formatTime(((_a = s === null || s === void 0 ? void 0 : s.opens) !== null && _a !== void 0 ? _a : 8) * 60), end: formatTime(Math.min(((_b = s === null || s === void 0 ? void 0 : s.opens) !== null && _b !== void 0 ? _b : 8) + 1, (_c = s === null || s === void 0 ? void 0 : s.closes) !== null && _c !== void 0 ? _c : 22) * 60) };
     const selectedRange = (data === null || data === void 0 ? void 0 : data.role) === 'usuario' ? form : activeBlockRange;
     const notice = (data === null || data === void 0 ? void 0 : data.role) === 'usuario' ? ((s === null || s === void 0 ? void 0 : s.notice) || 0) : 0;
     const ownedIds = new Set((data === null || data === void 0 ? void 0 : data.role) === 'usuario' ? data.mine.map(b => b.id) : []);
     const unavailableStart = startTooSoon(date + 'T' + selectedRange.start, clock, notice);
-    const earliestStart = minimumStart(date, clock, (_a = s === null || s === void 0 ? void 0 : s.opens) !== null && _a !== void 0 ? _a : 8, (_b = s === null || s === void 0 ? void 0 : s.closes) !== null && _b !== void 0 ? _b : 22, notice);
+    const earliestStart = minimumStart(date, clock, (_d = s === null || s === void 0 ? void 0 : s.opens) !== null && _d !== void 0 ? _d : 8, (_e = s === null || s === void 0 ? void 0 : s.closes) !== null && _e !== void 0 ? _e : 22, notice);
     function clearSelection() { setSelectionAnchor(null); setHasSelection(false); }
     function changeBlockTime(key, value) {
         setBlockRange({ ...activeBlockRange, space_id: space, date, [key]: value, ...(key === 'start' ? { end: suggestBlockEnd(value, s.closes) } : {}) });
@@ -276,15 +276,17 @@ function App() {
                     react_1.default.createElement("button", { className: tab === 'mine' ? 'active' : '', onClick: () => setTab('mine') }, data.role !== 'usuario' ? 'Visão geral' : 'Minhas reservas'),
                     data.role !== 'usuario' && react_1.default.createElement("button", { className: tab === 'manager' ? 'active' : '', onClick: () => setTab('manager') }, "Gest\u00E3o e auditoria"),
                     data.role !== 'usuario' && react_1.default.createElement("button", { className: tab === 'reports' ? 'active' : '', onClick: () => setTab('reports') }, "Relat\u00F3rios"),
+                    data.role !== 'usuario' && react_1.default.createElement("button", { className: tab === 'spaces' ? 'active' : '', onClick: () => setTab('spaces') }, "Cadastrar espa\u00E7o"),
                     data.role === 'admin' && react_1.default.createElement("button", { className: tab === 'users' ? 'active' : '', onClick: () => setTab('users') }, "Contas"),
                     react_1.default.createElement("button", { className: tab === 'account' ? 'active' : '', onClick: () => setTab('account') }, "Minha conta")),
                 tab === 'reports' && data.role !== 'usuario' && react_1.default.createElement(Reports, { today: data.today, spaces: data.spaces }),
                 tab === 'users' && data.role === 'admin' && react_1.default.createElement(Accounts, { currentUser: data.user }),
+                tab === 'spaces' && data.role !== 'usuario' && react_1.default.createElement(SpaceForm, { onSaved: async (id) => { await load(); setSpace(id); setDate(today); setTab('agenda'); clearSelection(); setBlockRange(null); setMessage('Espaço cadastrado e disponível na agenda.'); } }),
                 tab === 'account' && react_1.default.createElement(PasswordForm, { onChanged: () => endSession('Senha alterada. Entre novamente com sua nova senha.') }),
                 tab === 'agenda' && react_1.default.createElement(react_1.default.Fragment, null,
                     react_1.default.createElement("div", { className: "cards" }, data.spaces.map(x => react_1.default.createElement("button", { key: x.id, className: 'space ' + (space === x.id ? 'selected' : ''), onClick: () => { setSpace(x.id); clearSelection(); setBlockRange(null); setResult(null); } },
-                        react_1.default.createElement("div", { className: 'illustration i' + x.id },
-                            react_1.default.createElement("span", null, x.id === 1 ? '♨' : '≈')),
+                        react_1.default.createElement("div", { className: 'illustration ' + (x.id === 2 ? 'i2' : 'i1') },
+                            react_1.default.createElement("span", null, x.id === 1 ? '♨' : x.id === 2 ? '≈' : '◇')),
                         react_1.default.createElement("div", { className: "cardbody" },
                             react_1.default.createElement("small", null,
                                 "\u00C1REA COMUM 0",
@@ -507,6 +509,59 @@ function AgendaHistory({ space, date, bookings, blocks, ownedIds }) {
                 " \u00E0s ",
                 b.end.slice(11, 16)),
             react_1.default.createElement("p", null, b.reason))));
+}
+function SpaceForm({ onSaved }) {
+    const initial = { name: '', description: '', capacity: 10, opens: 8, closes: 22, fee: 0, notice: 2, monthly_limit: 3, approval: true };
+    const [form, setForm] = (0, react_1.useState)(initial), [error, setError] = (0, react_1.useState)(''), [busy, setBusy] = (0, react_1.useState)(false);
+    const field = (key, value) => setForm(v => ({ ...v, [key]: value }));
+    async function save(e) { e.preventDefault(); setBusy(true); setError(''); try {
+        const result = await api('spaces', form);
+        await onSaved(result.id);
+    }
+    catch (e) {
+        setError(e.message);
+    }
+    finally {
+        setBusy(false);
+    } }
+    return react_1.default.createElement("section", { className: "panel space-create" },
+        react_1.default.createElement("p", { className: "eyebrow" }, "GEST\u00C3O DOS ESPA\u00C7OS"),
+        react_1.default.createElement("h2", null, "Cadastrar espa\u00E7o"),
+        react_1.default.createElement("p", { className: "muted" }, "Defina as regras do novo espa\u00E7o. Elas ser\u00E3o salvas no banco e usadas na agenda e na valida\u00E7\u00E3o das reservas."),
+        error && react_1.default.createElement("p", { role: "alert", className: "error-message" }, error),
+        react_1.default.createElement("form", { onSubmit: save },
+            react_1.default.createElement("label", null,
+                "Nome do espa\u00E7o",
+                react_1.default.createElement("input", { required: true, minLength: "3", maxLength: "80", value: form.name, onChange: e => field('name', e.target.value) })),
+            react_1.default.createElement("label", null,
+                "Descri\u00E7\u00E3o",
+                react_1.default.createElement("textarea", { required: true, minLength: "5", maxLength: "500", value: form.description, onChange: e => field('description', e.target.value) })),
+            react_1.default.createElement("div", { className: "two" },
+                react_1.default.createElement("label", null,
+                    "Capacidade total de pessoas",
+                    react_1.default.createElement("input", { type: "number", required: true, min: "1", max: "10000", step: "1", value: form.capacity, onChange: e => field('capacity', Number(e.target.value)) })),
+                react_1.default.createElement("label", null,
+                    "Taxa informativa (R$)",
+                    react_1.default.createElement("input", { type: "number", required: true, min: "0", max: "1000000", step: "0.01", value: form.fee, onChange: e => field('fee', Number(e.target.value)) }))),
+            react_1.default.createElement("div", { className: "two" },
+                react_1.default.createElement("label", null,
+                    "Abertura (hora, de 0 a 22)",
+                    react_1.default.createElement("input", { type: "number", required: true, min: "0", max: "22", step: "1", value: form.opens, onChange: e => field('opens', Number(e.target.value)) })),
+                react_1.default.createElement("label", null,
+                    "Fechamento (hora, de 1 a 23)",
+                    react_1.default.createElement("input", { type: "number", required: true, min: "1", max: "23", step: "1", value: form.closes, onChange: e => field('closes', Number(e.target.value)) }))),
+            react_1.default.createElement("div", { className: "two" },
+                react_1.default.createElement("label", null,
+                    "Anteced\u00EAncia m\u00EDnima (horas)",
+                    react_1.default.createElement("input", { type: "number", required: true, min: "0", max: "8760", step: "1", value: form.notice, onChange: e => field('notice', Number(e.target.value)) })),
+                react_1.default.createElement("label", null,
+                    "Limite de reservas ativas por usu\u00E1rio/m\u00EAs",
+                    react_1.default.createElement("input", { type: "number", required: true, min: "1", max: "1000", step: "1", value: form.monthly_limit, onChange: e => field('monthly_limit', Number(e.target.value)) }))),
+            react_1.default.createElement("label", { className: "checkbox" },
+                react_1.default.createElement("input", { type: "checkbox", checked: form.approval, onChange: e => field('approval', e.target.checked) }),
+                "Exigir aprova\u00E7\u00E3o do gestor; desmarque para confirma\u00E7\u00E3o autom\u00E1tica."),
+            react_1.default.createElement("p", { className: "muted" }, "Os hor\u00E1rios s\u00E3o em horas inteiras, sem atravessar a meia-noite. Conflitos, bloqueios, suspens\u00F5es e aceite dos termos continuam sendo verificados para todos os espa\u00E7os."),
+            react_1.default.createElement("button", { className: "primary", disabled: busy }, busy ? 'Salvando…' : 'Cadastrar espaço')));
 }
 function DecisionNotes({ data }) { return react_1.default.createElement("div", null,
     react_1.default.createElement("h3", null, "Atualiza\u00E7\u00F5es das reservas"),

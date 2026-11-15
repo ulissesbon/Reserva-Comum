@@ -110,7 +110,15 @@ Selected cells are blue, separate from confirmed and pending states. Start/end
 fields also update the highlight. The application opens on today's date in
 Fortaleza. The agenda date picker and the **Data da reserva** field under
 **Solicitar reserva** share the same selected date. Date chevrons move one day at
-a time, and neither picker accepts a date before today.
+a time. The agenda picker can browse past dates in read-only mode, showing stored
+reservation statuses and effective blocked intervals without exposing third-party
+personal data. Cancelled/rejected reservations remain visible in the historical
+list. The two-column layout stays unchanged when browsing past dates: the request
+or blocking form remains visible, faded, and disabled. Confirmed reservations are
+labelled **Reservada** for other viewers, including managers/admins; only the
+requesting user sees **Confirmada** on their own agenda and historical entries.
+The reservation date field remains limited to today or later. Browsing a past day
+does not allow creating reservations or blocks and does not generate data.
 
 The agenda clock is synchronized with the server and updates unavailable cells
 as time passes. Past starts and reservation times that do not meet the space's
@@ -283,6 +291,7 @@ small commits. Repository instructions are maintained in `AGENTS.md`.
 - `test_features.py`: authentication, permissions, and reports.
 - `test_blocks.py`: schedule blocks, conflicts, concurrency, and audit history.
 - `test_timing.py`: server clock, advance-notice boundaries, and past-time rejection.
+- `test_history.py`: private historical agenda reads.
 - `frontend/src/`: React interface and CSS.
 - `frontend/dist/`: compiled application ready for local execution.
 - `.github/workflows/ci.yml`: continuous integration.

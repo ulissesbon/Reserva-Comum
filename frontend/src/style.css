@@ -28,3 +28,12 @@
 .profile>span{min-width:0;line-height:1.4;overflow-wrap:anywhere}
 .profile>button{flex-shrink:0}
 .slot.indisponível{background:#f2f3f4;border-color:#d4d9db;color:#616b70}
+
+
+.slot.sem-registro{background:#f7f8f8;color:#687477;border-color:#e0e4e4}
+
+
+.action-fields{border:0;padding:0;margin:0;min-width:0}
+.action-fields:disabled{opacity:.45}
+.action-fields>button{width:100%;margin-top:10px}
+.readonly-message{font-size:13px;color:#53665d;line-height:1.6}

@@ -131,6 +131,13 @@ class Handler(SimpleHTTPRequestHandler):
             agenda=[{k:x[k] for k in ('id','space_id','start','end','status')} for x in bookings if x['status'] in ('pendente','confirmada')]
             clock=now()
             data={'user':user,'role':identity['role'],'csrf_token':identity['csrf_token'],'spaces':spaces,'agenda':agenda,'blocks':[dict(x) for x in c.execute('SELECT id,space_id,start,end,reason FROM blocks WHERE removed_at IS NULL ORDER BY start')],'mine':mine,'today':clock.date().isoformat(),'server_time':clock.replace(tzinfo=TZ).isoformat(timespec='milliseconds')}
+            cutoff=clock.date().isoformat()+'T00:00'
+            data['history']=[{k:b[k] for k in ('id','space_id','start','end','status')} for b in bookings if b['start']<cutoff]
+            data['history_blocks']=[]
+            for block in c.execute('SELECT * FROM blocks WHERE start<? ORDER BY start',(cutoff,)):
+                effective_end=min(datetime.fromisoformat(block['end']),datetime.fromisoformat(block['removed_at'])) if block['removed_at'] else datetime.fromisoformat(block['end'])
+                if effective_end>datetime.fromisoformat(block['start']):
+                    data['history_blocks'].append({**{k:block[k] for k in ('id','space_id','start','reason')},'end':effective_end.isoformat(timespec='seconds')})
             data['decisions']=[dict(x) for x in c.execute("SELECT a.* FROM audit a JOIN bookings b ON b.id=a.booking_id WHERE b.user=? AND a.action IN ('confirmada','rejeitada','cancelada') ORDER BY a.id DESC",(user,))]
             if manager:
                 data.update(bookings=bookings,incidents=[dict(x) for x in c.execute('SELECT * FROM incidents')],audit=[dict(x) for x in c.execute('SELECT * FROM audit ORDER BY id DESC')])

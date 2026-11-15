@@ -291,21 +291,7 @@ function App() {
                 tab === 'spaces' && data.role !== 'usuario' && react_1.default.createElement(SpaceForm, { onSaved: async (id) => { await load(); setSpace(id); setDate(today); setTab('agenda'); clearSelection(); setBlockRange(null); setMessage('Espaço cadastrado e disponível na agenda.'); } }),
                 tab === 'account' && react_1.default.createElement(PasswordForm, { onChanged: () => endSession('Senha alterada. Entre novamente com sua nova senha.') }),
                 tab === 'agenda' && react_1.default.createElement(react_1.default.Fragment, null,
-                    react_1.default.createElement("div", { className: "cards" }, data.spaces.map(x => react_1.default.createElement("button", { key: x.id, className: 'space ' + (space === x.id ? 'selected' : ''), onClick: () => { setSpace(x.id); clearSelection(); setBlockRange(null); setResult(null); } },
-                        react_1.default.createElement("div", { className: 'illustration ' + (x.id === 2 ? 'i2' : 'i1') },
-                            react_1.default.createElement("span", null, x.id === 1 ? '♨' : x.id === 2 ? '≈' : '◇')),
-                        react_1.default.createElement("div", { className: "cardbody" },
-                            react_1.default.createElement("small", null,
-                                "\u00C1REA COMUM 0",
-                                x.id),
-                            react_1.default.createElement("h2", null, x.name),
-                            react_1.default.createElement("p", null, x.description),
-                            react_1.default.createElement("div", { className: "meta" },
-                                react_1.default.createElement("span", null,
-                                    "At\u00E9 ",
-                                    x.capacity,
-                                    " pessoas"),
-                                react_1.default.createElement("span", null, x.fee ? `R$ ${x.fee.toFixed(2)}` : 'Gratuito')))))),
+                    react_1.default.createElement(SpaceCarousel, { spaces: data.spaces, selectedId: space, onSelect: id => { setSpace(id); clearSelection(); setBlockRange(null); setResult(null); } }),
                     react_1.default.createElement("div", { className: data.role === 'usuario' ? 'columns' : 'columns columns-manager' },
                         react_1.default.createElement("section", { className: "panel" },
                             react_1.default.createElement("div", { className: "sectionhead" },
@@ -482,6 +468,65 @@ function App() {
                 "Reserva Comum \u00B7 Equipe 5 \u00B7 IFCE",
                 react_1.default.createElement("br", null),
                 "Consulta \u00B7 Reservas \u00B7 Gest\u00E3o \u00B7 Relat\u00F3rios")));
+}
+function SpaceCarousel({ spaces, selectedId, onSelect }) {
+    const trackRef = (0, react_1.useRef)(null), [edges, setEdges] = (0, react_1.useState)({ start: true, end: true });
+    function behavior() { return window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'; }
+    function updateEdges() { const track = trackRef.current; if (!track)
+        return; const next = { start: track.scrollLeft <= 1, end: track.scrollLeft + track.clientWidth >= track.scrollWidth - 1 }; setEdges(previous => previous.start === next.start && previous.end === next.end ? previous : next); }
+    function move(direction) { const track = trackRef.current; if (!track)
+        return; const card = track.querySelector('[data-space-id]'); const gap = parseFloat(window.getComputedStyle(track).gap) || 16; track.scrollBy({ left: direction * (((card === null || card === void 0 ? void 0 : card.getBoundingClientRect().width) || track.clientWidth * .8) + gap), behavior: behavior() }); }
+    (0, react_1.useEffect)(() => {
+        const track = trackRef.current;
+        if (!track)
+            return;
+        updateEdges();
+        const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(updateEdges) : null;
+        if (observer)
+            observer.observe(track);
+        else
+            window.addEventListener('resize', updateEdges);
+        return () => { if (observer)
+            observer.disconnect();
+        else
+            window.removeEventListener('resize', updateEdges); };
+    }, [spaces.length]);
+    (0, react_1.useEffect)(() => {
+        const track = trackRef.current, card = track === null || track === void 0 ? void 0 : track.querySelector('[data-space-id="' + selectedId + '"]');
+        if (!card)
+            return;
+        const viewport = track.getBoundingClientRect(), bounds = card.getBoundingClientRect();
+        if (bounds.left < viewport.left)
+            track.scrollBy({ left: bounds.left - viewport.left, behavior: behavior() });
+        else if (bounds.right > viewport.right)
+            track.scrollBy({ left: bounds.right - viewport.right, behavior: behavior() });
+    }, [selectedId, spaces.length]);
+    return react_1.default.createElement("section", { className: "space-carousel", "aria-label": "Espa\u00E7os dispon\u00EDveis", "aria-roledescription": "carrossel" },
+        react_1.default.createElement("button", { type: "button", className: "carousel-arrow", "aria-label": "Espa\u00E7os anteriores", title: "Espa\u00E7os anteriores", "aria-controls": "space-carousel-track", disabled: edges.start, onClick: () => move(-1) },
+            react_1.default.createElement("svg", { width: "22", height: "22", viewBox: "0 0 20 20", fill: "none", "aria-hidden": "true" },
+                react_1.default.createElement("path", { d: "m12 4-6 6 6 6", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }))),
+        react_1.default.createElement("div", { id: "space-carousel-track", className: "cards", ref: trackRef, tabIndex: "0", role: "group", "aria-label": "Lista de espa\u00E7os; use as setas para navegar", onScroll: updateEdges, onKeyDown: e => { if (e.target !== e.currentTarget)
+                return; if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                e.preventDefault();
+                move(e.key === 'ArrowLeft' ? -1 : 1);
+            } } }, spaces.map(x => react_1.default.createElement("button", { type: "button", key: x.id, "data-space-id": x.id, "aria-label": 'Selecionar ' + x.name, "aria-pressed": selectedId === x.id, className: 'space ' + (selectedId === x.id ? 'selected' : ''), onClick: () => onSelect(x.id) },
+            react_1.default.createElement("div", { className: 'illustration ' + (x.id === 2 ? 'i2' : 'i1') },
+                react_1.default.createElement("span", null, x.id === 1 ? '♨' : x.id === 2 ? '≈' : '◇')),
+            react_1.default.createElement("div", { className: "cardbody" },
+                react_1.default.createElement("small", null,
+                    "\u00C1REA COMUM ",
+                    String(x.id).padStart(2, '0')),
+                react_1.default.createElement("h2", null, x.name),
+                react_1.default.createElement("p", null, x.description),
+                react_1.default.createElement("div", { className: "meta" },
+                    react_1.default.createElement("span", null,
+                        "At\u00E9 ",
+                        x.capacity,
+                        " pessoas"),
+                    react_1.default.createElement("span", null, x.fee ? `R$ ${x.fee.toFixed(2)}` : 'Gratuito')))))),
+        react_1.default.createElement("button", { type: "button", className: "carousel-arrow", "aria-label": "Pr\u00F3ximos espa\u00E7os", title: "Pr\u00F3ximos espa\u00E7os", "aria-controls": "space-carousel-track", disabled: edges.end, onClick: () => move(1) },
+            react_1.default.createElement("svg", { width: "22", height: "22", viewBox: "0 0 20 20", fill: "none", "aria-hidden": "true" },
+                react_1.default.createElement("path", { d: "m8 4 6 6-6 6", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }))));
 }
 function DecisionJustification({ bookingId, value, onChange, onDecision, busy }) {
     const [error, setError] = (0, react_1.useState)('');

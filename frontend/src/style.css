@@ -47,3 +47,23 @@
 .decision-counter.invalid{color:#a52622}
 .decision-unavailable{opacity:.45;cursor:not-allowed}
 .decision-justification textarea[aria-invalid="true"]{border-color:#a52622}
+
+
+/* Compact, horizontally scrollable space cards. */
+.space-carousel{display:grid;grid-template-columns:44px minmax(0,1fr) 44px;align-items:center;gap:12px;margin:0 0 24px;min-width:0}
+.space-carousel .cards{display:flex;gap:16px;overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x mandatory;scrollbar-width:none;margin:0;padding:6px 4px 12px;min-width:0}
+.space-carousel .cards::-webkit-scrollbar{display:none}
+.space-carousel .cards:focus-visible{outline:3px solid #c57a20;outline-offset:3px;border-radius:12px}
+.space-carousel .space{flex:0 0 clamp(220px,calc(37.5% + 35px),436px);scroll-snap-align:start;display:flex;flex-direction:column;min-width:0}
+.space-carousel .illustration{height:109px;flex-shrink:0}
+.space-carousel .illustration span{font-size:57px}
+.space-carousel .illustration:after{width:75px;height:52px;right:19px;bottom:10px}
+.space-carousel .cardbody{padding:18px;flex:1;display:flex;flex-direction:column}
+.space-carousel .cardbody small{font-size:9px;letter-spacing:1px}
+.space-carousel .cardbody h2{font-size:21px;line-height:1.2;margin:5px 0 9px}
+.space-carousel .cardbody p{font-size:12px;line-height:1.45;margin:7px 0 14px}
+.space-carousel .meta{font-size:11px;margin-top:auto;padding-top:11px;gap:8px;flex-wrap:wrap}
+.carousel-arrow{width:44px;min-height:64px;display:flex;align-items:center;justify-content:center;padding:0;background:#fff;box-shadow:0 3px 12px #173e330d;border-radius:12px}
+.carousel-arrow:disabled{opacity:.3;cursor:default}
+.carousel-arrow:not(:disabled):hover{background:#edf4e9;border-color:#327357}
+@media(max-width:760px){.space-carousel{gap:6px}.space-carousel .space{flex-basis:85%}.space-carousel .illustration{height:83px}.space-carousel .illustration span{font-size:45px}.space-carousel .cardbody{padding:12px}.space-carousel .cardbody h2{font-size:18px}.space-carousel .cardbody p{font-size:11px}.carousel-arrow{min-height:56px}}

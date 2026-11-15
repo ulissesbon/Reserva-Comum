@@ -129,7 +129,8 @@ class Handler(SimpleHTTPRequestHandler):
             bookings=[dict(x) for x in c.execute('SELECT * FROM bookings ORDER BY start')]
             mine=[x for x in bookings if x['user']==user]
             agenda=[{k:x[k] for k in ('id','space_id','start','end','status')} for x in bookings if x['status'] in ('pendente','confirmada')]
-            data={'user':user,'role':identity['role'],'csrf_token':identity['csrf_token'],'spaces':spaces,'agenda':agenda,'blocks':[dict(x) for x in c.execute('SELECT id,space_id,start,end,reason FROM blocks WHERE removed_at IS NULL ORDER BY start')],'mine':mine,'today':now().date().isoformat()}
+            clock=now()
+            data={'user':user,'role':identity['role'],'csrf_token':identity['csrf_token'],'spaces':spaces,'agenda':agenda,'blocks':[dict(x) for x in c.execute('SELECT id,space_id,start,end,reason FROM blocks WHERE removed_at IS NULL ORDER BY start')],'mine':mine,'today':clock.date().isoformat(),'server_time':clock.replace(tzinfo=TZ).isoformat(timespec='milliseconds')}
             data['decisions']=[dict(x) for x in c.execute("SELECT a.* FROM audit a JOIN bookings b ON b.id=a.booking_id WHERE b.user=? AND a.action IN ('confirmada','rejeitada','cancelada') ORDER BY a.id DESC",(user,))]
             if manager:
                 data.update(bookings=bookings,incidents=[dict(x) for x in c.execute('SELECT * FROM incidents')],audit=[dict(x) for x in c.execute('SELECT * FROM audit ORDER BY id DESC')])

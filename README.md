@@ -107,8 +107,18 @@ be updated or deleted through SQL while the protection triggers are installed.
 
 On the user agenda, click the first and last hourly cells to select an interval.
 Selected cells are blue, separate from confirmed and pending states. Start/end
-fields also update the highlight. Date chevrons move one day at a time and prevent
-navigation before today. The backend remains the authority for availability.
+fields also update the highlight. The application opens on today's date in
+Fortaleza. The agenda date picker and the **Data da reserva** field under
+**Solicitar reserva** share the same selected date. Date chevrons move one day at
+a time, and neither picker accepts a date before today.
+
+The agenda clock is synchronized with the server and updates unavailable cells
+as time passes. Past starts and reservation times that do not meet the space's
+advance notice are disabled; manager blocks require a future start. Manual time
+fields and submission controls follow those same limits. Pool reservations still
+require two hours' notice, barbecue reservations still require 24 hours, and no
+late-booking grace period or new approval-expiration rule is applied. The backend
+remains the authority for availability and validates every write again.
 
 ## Schedule blocks
 
@@ -272,6 +282,7 @@ small commits. Repository instructions are maintained in `AGENTS.md`.
 - `test_poc.py`: reservation regressions and HTTP test transports.
 - `test_features.py`: authentication, permissions, and reports.
 - `test_blocks.py`: schedule blocks, conflicts, concurrency, and audit history.
+- `test_timing.py`: server clock, advance-notice boundaries, and past-time rejection.
 - `frontend/src/`: React interface and CSS.
 - `frontend/dist/`: compiled application ready for local execution.
 - `.github/workflows/ci.yml`: continuous integration.

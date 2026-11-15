@@ -24,6 +24,7 @@
 .block-manager{scroll-margin-top:24px}.block-create{width:100%}.block-manager a,.columns-manager .muted a{color:#205640;font-weight:700}.block-manager h4{margin:0 0 10px}.block-manager .actions>button{width:auto;margin:0}
 
 
-/* Keep account details vertically centered. */
+/* Keep account details centered and unavailable times distinct from space blocks. */
 .profile>span{min-width:0;line-height:1.4;overflow-wrap:anywhere}
 .profile>button{flex-shrink:0}
+.slot.indisponível{background:#f2f3f4;border-color:#d4d9db;color:#616b70}

@@ -99,22 +99,73 @@ These are fictional project parameters. Business timestamps use Fortaleza time
 barbecue requests remain pending until a manager or admin makes a decision.
 
 Pending and confirmed reservations both occupy their intervals. Creation and
-approval revalidate the rules inside a SQLite write transaction. Approval also
-rechecks advance notice, so a late decision can be refused. Requesters may cancel
+approval revalidate conflicts and current impediments inside a SQLite write
+transaction. Advance notice is checked when submitting the request; manager
+approval is allowed until the reservation starts without requiring the original
+advance-notice window a second time. Requesters may cancel
 before the reservation starts. Cancellation and slot release are atomic; repeated
 cancellation does not duplicate its audit event. Reservation audit records cannot
 be updated or deleted through SQL while the protection triggers are installed.
 
+Manager decisions require a justification of 5–200 characters. Leading/trailing
+spaces do not count toward the minimum. The live counter turns red below the
+minimum or above the maximum, and decision buttons appear unavailable while the
+text is invalid. Clicking an unavailable decision explains the applicable limit
+without submitting it. Both approval and rejection are validated again by the API.
+Server refusals and their failed rules appear beside the decision buttons as well
+as in the page notice, so a blocked approval does not appear to do nothing.
+
 On the user agenda, click the first and last hourly cells to select an interval.
 Selected cells are blue, separate from confirmed and pending states. Start/end
-fields also update the highlight. Date chevrons move one day at a time and prevent
-navigation before today. The backend remains the authority for availability.
+fields also update the highlight. The application opens on today's date in
+Fortaleza. The agenda date picker and the **Data da reserva** field under
+**Solicitar reserva** share the same selected date. Date chevrons move one day at
+a time. The agenda picker can browse past dates in read-only mode, showing stored
+reservation statuses and effective blocked intervals without exposing third-party
+personal data. Cancelled/rejected reservations remain visible in the historical
+list. The two-column layout stays unchanged when browsing past dates: the request
+or blocking form remains visible, faded, and disabled. Confirmed reservations are
+labelled **Reservada** for other viewers, including managers/admins; only the
+requesting user sees **Confirmada** on their own agenda and historical entries.
+The reservation date field remains limited to today or later. Browsing a past day
+does not allow creating reservations or blocks and does not generate data.
+
+The agenda clock is synchronized with the server and updates unavailable cells
+as time passes. Past starts and reservation times that do not meet the space's
+advance notice are disabled; manager blocks require a future start. Manual time
+fields and submission controls follow those same limits. Pool reservations still
+require two hours' notice, barbecue reservations still require 24 hours, and no
+late-booking grace period or new approval-expiration rule is applied. The backend
+remains the authority for availability and validates every write again.
+
+## Creating spaces
+
+Managers and admins can use **Cadastrar espaço** to register a name, description,
+capacity, opening/closing hours, informational fee, minimum advance notice,
+monthly reservation limit, and whether manager approval is required. The new
+space becomes available in the existing agenda, booking, blocking, and reporting
+flows. Regular users cannot create spaces.
+
+These parameters are already persisted in `spaces` and read by the generic
+reservation validator. The pool/barbecue values in `init()` are initial examples,
+not conditions that limit the application to two spaces. Core algorithms such as
+conflict checks, ownership, suspension, and same-day intervals remain implemented
+in code. New spaces use whole-hour opening/closing times between 00:00 and 23:00,
+without crossing midnight; names must be unique ignoring case. This screen creates
+spaces; editing existing rules and spaces remains outside this update.
 
 ## Schedule blocks
 
 Under **Espaços e agenda**, managers and admins select a space and date, then use
-**Bloquear horários** below the agenda. Enter a start, end, and a 5–500-character
-reason. The reason is visible in the public agenda.
+**Bloquear horários** beside the agenda on desktop or below it on narrow screens.
+Click the first and last available cells to fill the blocking interval, or enter
+start/end times directly. The blue selection stays synchronized with the form;
+confirmed, pending, and blocked cells retain their own colors and are unavailable
+for selection. Saving a block refreshes the agenda and clears the temporary selection.
+
+Changing the start suggests an end one hour later, capped at the space's closing
+time. The end remains editable for longer intervals. Enter a 5–500-character
+reason; the reason is visible in the public agenda.
 
 New blocks must start in the future, stay within one day and the space's opening
 hours, and avoid pending/confirmed reservations and other active blocks. Adjacent
@@ -265,6 +316,10 @@ small commits. Repository instructions are maintained in `AGENTS.md`.
 - `test_poc.py`: reservation regressions and HTTP test transports.
 - `test_features.py`: authentication, permissions, and reports.
 - `test_blocks.py`: schedule blocks, conflicts, concurrency, and audit history.
+- `test_timing.py`: server clock, advance-notice boundaries, and past-time rejection.
+- `test_decision_reason.py`: decision-reason boundaries and character counts.
+- `test_history.py`: private historical agenda reads.
+- `test_spaces.py`: configurable-space creation and rule validation.
 - `frontend/src/`: React interface and CSS.
 - `frontend/dist/`: compiled application ready for local execution.
 - `.github/workflows/ci.yml`: continuous integration.
@@ -272,7 +327,7 @@ small commits. Repository instructions are maintained in `AGENTS.md`.
 
 ## Remaining scope
 
-Waitlists, external notifications, full space/rule configuration through the UI,
+Waitlists, external notifications, editing existing spaces/rules through the UI,
 payments, and financial reports are not implemented. Incident records link a user
 and a space but do not include attachments or classification.
 

@@ -49,7 +49,7 @@ def init():
             c.execute("INSERT INTO incidents(space_id,user,description,action,penalty_until,created) VALUES(1,'morador','Atraso na limpeza na utilização anterior.','Orientação registrada; sem penalidade.',NULL,?)", (now().isoformat(timespec='seconds'),))
             c.execute('INSERT INTO incidents(space_id,user,description,action,penalty_until,created) VALUES(2,?,?,?,?,?)',('restrito','Descumprimento das regras de uso.','Suspensão temporária.',(now()+timedelta(days=30)).isoformat(timespec='minutes'),now().isoformat(timespec='seconds')))
 
-def validate(c,d,user,exclude=None):
+def validate(c,d,user,exclude=None,for_approval=False):
     if type(d['space_id']) is not int: raise ValueError('Espaço deve ser um identificador inteiro.')
     s=c.execute('SELECT * FROM spaces WHERE id=?',(d['space_id'],)).fetchone()
     if not s: raise ValueError('Espaço inexistente.')
@@ -62,7 +62,10 @@ def validate(c,d,user,exclude=None):
     check('Finalidade',isinstance(d.get('purpose'),str) and 3<=len(d['purpose'].strip())<=200,'Descreva a finalidade em 3 a 200 caracteres.')
     check('Termos',d.get('terms') is True,'Aceite os termos antes de solicitar.')
     check('Capacidade',1<=d['guests']<=s['capacity'],f"Informe entre 1 e {s['capacity']} pessoas, incluindo você.")
-    check('Antecedência',start>=now()+timedelta(hours=s['notice']),f"Reserve com pelo menos {s['notice']} horas de antecedência.")
+    if for_approval:
+        check('Prazo de aprovação',start>now(),'A aprovação deve ocorrer antes do início da reserva.')
+    else:
+        check('Antecedência',start>=now()+timedelta(hours=s['notice']),f"Reserve com pelo menos {s['notice']} horas de antecedência.")
     check('Funcionamento',start.hour>=s['opens'] and end<=start.replace(hour=s['closes'],minute=0,second=0,microsecond=0),f"Escolha um intervalo entre {s['opens']}h e {s['closes']}h.")
     overlap=c.execute("SELECT 1 FROM bookings WHERE space_id=? AND status IN ('pendente','confirmada') AND start<? AND end>? AND id!=?",(s['id'],d['end'],d['start'],exclude or -1)).fetchone()
     check('Sobreposição',not overlap,'Escolha outro horário se houver pedido pendente ou reserva confirmada.')
@@ -129,7 +132,15 @@ class Handler(SimpleHTTPRequestHandler):
             bookings=[dict(x) for x in c.execute('SELECT * FROM bookings ORDER BY start')]
             mine=[x for x in bookings if x['user']==user]
             agenda=[{k:x[k] for k in ('id','space_id','start','end','status')} for x in bookings if x['status'] in ('pendente','confirmada')]
-            data={'user':user,'role':identity['role'],'csrf_token':identity['csrf_token'],'spaces':spaces,'agenda':agenda,'blocks':[dict(x) for x in c.execute('SELECT id,space_id,start,end,reason FROM blocks WHERE removed_at IS NULL ORDER BY start')],'mine':mine,'today':now().date().isoformat()}
+            clock=now()
+            data={'user':user,'role':identity['role'],'csrf_token':identity['csrf_token'],'spaces':spaces,'agenda':agenda,'blocks':[dict(x) for x in c.execute('SELECT id,space_id,start,end,reason FROM blocks WHERE removed_at IS NULL ORDER BY start')],'mine':mine,'today':clock.date().isoformat(),'server_time':clock.replace(tzinfo=TZ).isoformat(timespec='milliseconds')}
+            cutoff=clock.date().isoformat()+'T00:00'
+            data['history']=[{k:b[k] for k in ('id','space_id','start','end','status')} for b in bookings if b['start']<cutoff]
+            data['history_blocks']=[]
+            for block in c.execute('SELECT * FROM blocks WHERE start<? ORDER BY start',(cutoff,)):
+                effective_end=min(datetime.fromisoformat(block['end']),datetime.fromisoformat(block['removed_at'])) if block['removed_at'] else datetime.fromisoformat(block['end'])
+                if effective_end>datetime.fromisoformat(block['start']):
+                    data['history_blocks'].append({**{k:block[k] for k in ('id','space_id','start','reason')},'end':effective_end.isoformat(timespec='seconds')})
             data['decisions']=[dict(x) for x in c.execute("SELECT a.* FROM audit a JOIN bookings b ON b.id=a.booking_id WHERE b.user=? AND a.action IN ('confirmada','rejeitada','cancelada') ORDER BY a.id DESC",(user,))]
             if manager:
                 data.update(bookings=bookings,incidents=[dict(x) for x in c.execute('SELECT * FROM incidents')],audit=[dict(x) for x in c.execute('SELECT * FROM audit ORDER BY id DESC')])
@@ -199,6 +210,26 @@ class Handler(SimpleHTTPRequestHandler):
                         c.execute('DELETE FROM sessions WHERE username=?',(username,))
                         auth.security_event(c,user,'conta_atualizada',username)
                     c.commit();return self.send_json(200,{'ok':True})
+                if self.path=='/api/spaces':
+                    if role not in ('gestor','admin'):
+                        return self.send_json(403,{'error':'Apenas gestores e administradores podem cadastrar espaços.'})
+                    for key,minimum,maximum in (('name',3,80),('description',5,500)):
+                        if not isinstance(d.get(key),str) or not minimum<=len(d[key].strip())<=maximum:
+                            raise ValueError(f'{"Nome" if key=="name" else "Descrição"}: informe de {minimum} a {maximum} caracteres.')
+                    for key,minimum,maximum in (('capacity',1,10000),('opens',0,22),('closes',1,23),('notice',0,8760),('monthly_limit',1,1000)):
+                        if type(d.get(key)) is not int or not minimum<=d[key]<=maximum:
+                            raise ValueError(f'Campo {key}: informe um número inteiro entre {minimum} e {maximum}.')
+                    if d['closes']<=d['opens']: raise ValueError('O fechamento deve ser após a abertura, no mesmo dia.')
+                    if type(d.get('fee')) not in (int,float) or not 0<=d['fee']<=1000000:
+                        raise ValueError('A taxa deve ser um valor entre 0 e 1.000.000.')
+                    if type(d.get('approval')) is not bool: raise ValueError('Informe se o espaço exige aprovação.')
+                    name=d['name'].strip()
+                    if any(row['name'].casefold()==name.casefold() for row in c.execute('SELECT name FROM spaces')):
+                        return self.send_json(409,{'error':'Já existe um espaço com esse nome.'})
+                    cur=c.execute('''INSERT INTO spaces(name,description,capacity,opens,closes,fee,notice,monthly_limit,approval,rules_version)
+                        VALUES(?,?,?,?,?,?,?,?,?,?)''',(name,d['description'].strip(),d['capacity'],d['opens'],d['closes'],d['fee'],d['notice'],d['monthly_limit'],int(d['approval']),'1.0'))
+                    auth.security_event(c,user,'espaco_criado',str(cur.lastrowid));c.commit()
+                    return self.send_json(200,{'ok':True,'id':cur.lastrowid})
                 if self.path in ('/api/blocks','/api/blocks/remove'):
                     if role not in ('gestor','admin'):
                         return self.send_json(403,{'error':'Apenas gestores e administradores podem gerenciar bloqueios.'})
@@ -282,11 +313,14 @@ class Handler(SimpleHTTPRequestHandler):
                     b=c.execute('SELECT * FROM bookings WHERE id=?',(d['id'],)).fetchone()
                     if not b: return self.send_json(404,{'error':'Pedido inexistente.'})
                     if b['status']!='pendente': return self.send_json(409,{'error':'Este pedido já foi decidido.'})
-                    if d.get('status') not in ('confirmada','rejeitada') or not isinstance(d.get('reason'),str) or not 5<=len(d['reason'].strip())<=500: raise ValueError('Informe decisão e justificativa de 5 a 500 caracteres.')
+                    if d.get('status') not in ('confirmada','rejeitada'): raise ValueError('Decisão inválida.')
+                    if not isinstance(d.get('reason'),str): raise ValueError('Informe a justificativa da decisão.')
+                    if len(d['reason'])>200: raise ValueError('A justificativa deve ter no máximo 200 caracteres.')
+                    if len(d['reason'].strip())<5: raise ValueError('A justificativa deve ter no mínimo 5 caracteres, sem contar espaços nas extremidades.')
                     if d['status']=='confirmada':
                         payload=dict(b); payload['terms']=True
-                        _,checks=validate(c,payload,b['user'],b['id'])
-                        if not all(x['ok'] for x in checks): return self.send_json(422,{'error':'As regras mudaram ou o prazo expirou. Rejeite o pedido com justificativa.','checks':checks})
+                        _,checks=validate(c,payload,b['user'],b['id'],for_approval=True)
+                        if not all(x['ok'] for x in checks): return self.send_json(422,{'error':'A aprovação foi recusada pelas regras atuais. Confira os impedimentos abaixo.','checks':checks})
                     c.execute('UPDATE bookings SET status=? WHERE id=?',(d['status'],b['id']))
                     event(c,b['id'],user,d['status'],d['reason'].strip()); c.commit()
                     return self.send_json(200,{'ok':True})

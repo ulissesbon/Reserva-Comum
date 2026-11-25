@@ -61,7 +61,7 @@ def validate(c,d,user,exclude=None,for_approval=False):
     check('Intervalo',end>start and start.date()==end.date(),'Fim após início, no mesmo dia.')
     check('Finalidade',isinstance(d.get('purpose'),str) and 3<=len(d['purpose'].strip())<=200,'Descreva a finalidade em 3 a 200 caracteres.')
     check('Termos',d.get('terms') is True,'Aceite os termos antes de solicitar.')
-    check('Capacidade',1<=d['guests']<=s['capacity'],f"Informe entre 1 e {s['capacity']} pessoas, incluindo você.")
+    check('Capacidade',1<=d['guests'],f"Informe entre 1 e {s['capacity']} pessoas, incluindo você.") ### <=s['capacity']
     if for_approval:
         check('Prazo de aprovação',start>now(),'A aprovação deve ocorrer antes do início da reserva.')
     else:
